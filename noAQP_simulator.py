@@ -45,24 +45,26 @@ epsr = 78.5
 kb = 1.380648e-23
 T = 298 #K
 charge = 1.60217e-19 #C --- electron charge
-
+#cCF = 1 # concentration of CF
+#ratio=0.001
+#phi0 = 0.1 #from Priyesh25.7
 pH=7.4
 nm=1e-9
 rr = 2 # radius of pore
 dd = 1 # thickness of buffering shell
 #Btot=100 # ratio of [buffer]/[CF]
+#spacer =10.
 cKCl = 1.
-meshfile ="/home/AD/srbl226/aqui/TEST.hdf5"
+#RevH = 10e-9
+#length =10e-9
+#meshfile = "/home/bsu233/scratch/project/NanoPNP/CFdiffusion/UnitCell/tt.xml"
+meshfile ="/home/AD/srbl226/aqui/name.hdf5"
 def runPNP(
   meshfile = meshfile,
-  num = 4,
-  phiAQ = 5.,
   cKCl = cKCl,
   phiPore = -10.
   ):
-  phiAQ=0
   phiPore=0
-  print "phiAQ is: ", phiAQ
   hdf5Name = meshfile
   cCl = cKCl
   cK = cKCl
@@ -71,8 +73,9 @@ def runPNP(
   #radius = rr*nm
   #spacing = space *nm
   #thickness = dd*nm
-
-  #--------------------------------------------------
+  #Adding ability to change KCl concentration applied to the top for Figure 4
+  #cca0 = cCaCl2 #initial K+ concentration
+  #ccl0 = 2*cCaCl2 #initial Cl- concentration
 
   zk = 0#1
   zcl = 0#-1 # Cl
@@ -81,6 +84,23 @@ def runPNP(
   coh0 = 10**(-11+pH) #mol/m^3 inital [OH]
   ccl0 = cCl
   ck0 = cK
+
+  #---------------------------
+  # TODO:apply a pH regulated surface charge density
+  #pKa = 7
+  #pKb = 1.9
+  #pKm = pKm
+  #Gamma = 5e-6 #mol/m^2
+
+  #-- Boundary definition---
+###
+## --Define a shell with thickness d inside the pore, CF with in this shell has a smaller Dcf_bulk
+## df_buffer = 1/(1 + Ks*B_tot/(Ks+cf0)**2))*Dcf_bulk
+## equation is from  Wagner, J., & Keizer, J. (1994). Effects of rapid buffers on Ca2+ diffusion and Ca2+ oscillations. Biophysical Journal, 67(1), 447.
+## here suppose B_tot ( buffer concentration is one half of [CF]bulk = 0.5 mol/m^2 (mM)
+## Ks is dissociation constant = 1
+#
+##
   parameters["allow_extrapolation"] = True
   parameters["ghost_mode"] = "shared_facet"
   mesh = Mesh()
@@ -92,8 +112,8 @@ def runPNP(
   hdf5.read(cells,'cells')
   hdf5.close()
 
-  ds = Measure('exterior_facet',subdomain_data=facets, domain=mesh) # Interior surface integration
-  dS = Measure('interior_facet',subdomain_data=facets, domain=mesh)
+  ds = Measure('ds',subdomain_data=facets, domain=mesh) # Interior surface integration
+  dS = Measure('dS',subdomain_data=facets, domain=mesh)
   dx = Measure("dx",subdomain_data=cells,domain=mesh)
 
   #Define MixedFunctionSpace--
@@ -147,10 +167,8 @@ def runPNP(
   # assigin boundary condition for K+ and Cl-
   bc3 = DirichletBC(V.sub(0),0,facets,4) #----> Assign a 0 [K+] at the botton reservor
   bc4 = DirichletBC(V.sub(0),ck0,facets,3)
-  bc5 = DirichletBC(V.sub(4),Constant(phiAQ/1000),facets,6)
-  bc5x = DirichletBC(V.sub(1),0,facets,4)
-  bc6 = DirichletBC(V.sub(4),Constant(phiAQ/1000),facets,5)
-  bc6x = DirichletBC(V.sub(1),ccl0,facets,3)
+  bc5 = DirichletBC(V.sub(1),0,facets,4)
+  bc6 = DirichletBC(V.sub(1),ccl0,facets,3)
   # assign boundary condition for H+ and OH-
   bc7 = DirichletBC(V.sub(2),ch0,facets,4)
   bc8 = DirichletBC(V.sub(2),ch0,facets,3)
@@ -159,8 +177,14 @@ def runPNP(
   bcx = DirichletBC(V.sub(4),Constant(phiPore/1000),facets,2)
 
 
+
+
+
   #-------------------------------------
-  bcc = [bc1,bc2,bc3,bc4,bc5,bc5x,bc6,bc6x,bc7,bc8,bc9,bc10,bcx]
+  # TODO: Apply surface charge density as NeumanBC
+  # Now works as DBC using Grahame euqaiton to convert sigma to psi
+  #
+  bcc = [bc1,bc2,bc3,bc4,bc5,bc6,bc7,bc8,bc9,bc10,bcx]
   #-------------------
   # Solve the problem
   #--------------------
@@ -168,35 +192,50 @@ def runPNP(
   problem = NonlinearVariationalProblem(FF, u, bcs=bcc,J=J) #deleted FF preceding u
   solver = NonlinearVariationalSolver(problem)
 
-
-
   (iter, converged) = solver.solve()
-  #print "This one solved \n\n\n\n\n\n\n\n\n\n !!!!!!!!!!!!!"
+  #solver.solve()
 
   ck_u,ccl_u,ch_u,coh_u,v_u = u.split(True)
-
 
 
   TT = ck_u.function_space()
   degree = TT.ufl_element().degree()
   W = VectorFunctionSpace(mesh,'P',degree)
-  #print "step before fluxck"
   fluxck = project(grad(ck_u)*Constant(Dk),W)
-  #print "step after fluxck"
+# fluxccl = project(grad(ccl_u)*Constant(-Dcl),W)
+# fluxch = project(grad(ch_u)*Constant(-Dh),W)
+# fluxoh = project(grad(coh_u)*Constant(-Doh),W)
+  #fluxcf = project(grad(ccf_u)*Constant(-Dcf),W)
 
-  v1file = File("solutions/AQ_{}_{}_{}.pvd".format(cK,num,phiAQ))
+  #R = radius/nm
+#  v1file = File("ccf_%s_%s.pvd"%(str(RRR),str(phi0)))
+#  v1file << ccf_u
+
+#  v3file = File("ck_%s_%s_%s.pvd"%(str(IonicS),str(ratio)))
+#  v3file << ck_u
+  v1file =  File("solutions/AQ_NO_{}.pvd".format(cK))
   v1file << ck_u
   v2file = File("solutions/ckflux_%s.pvd"%(str(cK)))
   v2file << fluxck
+
 
   import os
   myPath = os.path.abspath(__file__)
   path = os.path.abspath(os.path.join(myPath,'..'))
   path = path+"/"
-  hdf5=HDF5File(mesh.mpi_comm(),path+"AQ_{}_solution.hdf5".format(num),'w')
+  hdf5=HDF5File(mesh.mpi_comm(),path+"AQ_NO_solution.hdf5",'w')
   hdf5.write(ck_u,"solution")
   hdf5.close()
 
+
+# v3file = File("cclflux_%s_%s.pvd"%(str(cKCl),str(phi0)))
+# v3file << fluxccl
+# v4file = File("chflux_%s_%s.pvd"%(str(cKCl),str(phi0)))
+# v4file << fluxch
+# v5file = File("cohflux_%s_%s.pvd"%(str(cKCl),str(phi0)))
+# v5file << fluxoh
+# v6file = File("v_%s_%s.pvd"%(str(cKCl),str(phi0)))
+# v6file << v_u
 
   n = FacetNormal(mesh)
   area1 = assemble(Constant(1.0)*ds(1))#,domain=facets))
@@ -207,37 +246,26 @@ def runPNP(
   #print "area3", area3
   area4 = assemble(Constant(1.0)*ds(4))#,domain=facets))
   #print "area4", area4
-  area5 = assemble(Constant(1.0)*ds(5))#,domain=facets))
+  area5 = assemble(Constant(1.0)*dS(5))#,domain=facets))
   #print "area5", area5
-  area6 = assemble(Constant(1.0)*ds(6))#,domain=facets))
+  area6 = assemble(Constant(1.0)*dS(6))#,domain=facets))
   #print "area6", area6
-  area7 = assemble(Constant(1.0)*dS(7))#,domain=facets))
-  area8 = assemble(Constant(1.0)*dS(8))#,domain=facets))
-  #print "area7 ", area7
-  #print "area8 ",area8
-  #print "not broken yet"
-  #print "pre dot"
-
-
   fl = dot(fluxck,n)
-  flux_bot = assemble(fl('-')*dS(7))
-  flux_top = assemble(fl('+')*dS(8))
-  avgf = (flux_top)/(area1)
-  avgbot = (flux_bot)/(area1)
+  flux_bot = assemble(fl('-')*dS(5))
+  flux_top = assemble(fl('+')*dS(6))
+  avgf = (flux_top/area1)
+  avgbot = (flux_bot/area1)
   length =1e-8
   RevH = 1e-8
-  Deff = avgf*(length + 2*RevH)/ck0#/Dk
+  Deff = avgf*(length + 2*RevH)/ck0
   Deffbot = avgbot*(length + 2*RevH)/ck0
   #print "length", length
   #print "RevH", RevH
   #print "Deff", Deff
-  file = open("AQ_{}_{}.txt".format(num, phiAQ), "w")
+  file = open("noAQ.txt", "w")
   file.write("Deff {:3}\n".format(Deff))
   file.write("Deff {:3}\n".format(Deffbot))
-  #file.write("{:3}".format(Deff))
-  file.write("VolFrac {:3}".format(area8/area3))
-  #file.write("{:3}".format(area7/area3))
-  file.close()
+  file.write("VolFrac {:3}".format(area5/area3))
   return Deff
 
 ###############
@@ -281,7 +309,6 @@ if __name__ == "__main__":
   #fileIn= sys.argv[1]
   #if(len(sys.argv)==3):
   #  1
-  #  1
   #  #print "arg"
 
   # Loops over each argument in the command line
@@ -295,12 +322,18 @@ if __name__ == "__main__":
       arg2=np.float(sys.argv[i+2])
       arg3=np.float(sys.argv[i+3])
       arg4=np.float(sys.argv[i+4])
+
+      #arg7=(np.float(sys.argv[i+7]))
       runPNP(meshfile=arg1, phiPore=arg2,phiAQ=arg3,cKCl=arg4) #same as at the pickle line, justing doing radii
       quit()
     if(arg=="-runner"):
       arg1=sys.argv[i+1]
-      arg2=int(sys.argv[i+2])
-      arg3=int(sys.argv[i+3])
-      arg4=1#int(sys.argv[i+4])
-      runPNP(meshfile=arg1,num=arg2, phiAQ = arg3, cKCl = arg4) #value provided is in mM = mol/m^3
+      #arg2=int(sys.argv[i+2])
+      #arg3=int(sys.argv[i+2])
+      runPNP(meshfile=arg1)#,boxSize=arg3) #value provided is in mM = mol/m^3
       quit()
+
+
+
+
+  raise RuntimeError("Arguments not understood")
