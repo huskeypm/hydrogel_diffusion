@@ -1,12 +1,12 @@
 import numpy as np
 import math as m
 nm = 1.0e-9
-aqpH = 6.0e-9
+aqpH = 3.0e-9
 
 def Cylinder(centers,radius=1e-9,boxSize=15e-9, length = 1e-8, revH = 1e-8):
 
     text = "lc = 1e-9;\n"
-    text += "lc2 = 7e-10;\n"
+    text += "lc2 = 10e-10;\n"
     lineNames = ""
     text+="radius = %s;\n"%(radius)
     text+="boxSize = %s;\n"%(boxSize)

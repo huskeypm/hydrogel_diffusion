@@ -215,8 +215,8 @@ def runPNP(
 #  v3file << ck_u
   v1file =  File("solutions/AQ_NO_{}.pvd".format(cK))
   v1file << ck_u
-  v2file = File("solutions/ckflux_%s.pvd"%(str(cK)))
-  v2file << fluxck
+  #v2file = File("solutions/ckflux_%s.pvd"%(str(cK)))
+  #v2file << fluxck
 
 
   import os
@@ -265,7 +265,7 @@ def runPNP(
   file = open("noAQ.txt", "w")
   file.write("Deff {:3}\n".format(Deff))
   file.write("Deff {:3}\n".format(Deffbot))
-  file.write("VolFrac {:3}".format(area5/area3))
+  #file.write("VolFrac {:3}".format(area/area3))
   return Deff
 
 ###############

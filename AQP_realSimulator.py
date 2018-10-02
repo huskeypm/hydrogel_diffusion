@@ -56,13 +56,15 @@ meshfile ="/home/AD/srbl226/aqui/TEST.hdf5"
 def runPNP(
   meshfile = meshfile,
   num = 4,
-  phiAQ = 5.,
+  bR = 3,
   cKCl = cKCl,
   phiPore = -10.
   ):
+  bR=bR
+  #aqD = aqD*nm
   phiAQ=0
   phiPore=0
-  print "phiAQ is: ", phiAQ
+  #print "phiAQ is: ", phiAQ
   hdf5Name = meshfile
   cCl = cKCl
   cK = cKCl
@@ -147,16 +149,16 @@ def runPNP(
   # assigin boundary condition for K+ and Cl-
   bc3 = DirichletBC(V.sub(0),0,facets,4) #----> Assign a 0 [K+] at the botton reservor
   bc4 = DirichletBC(V.sub(0),ck0,facets,3)
-  bc5 = DirichletBC(V.sub(4),Constant(phiAQ/1000),facets,6)
+  bc5 = DirichletBC(V.sub(4),Constant(0),facets,6)
   bc5x = DirichletBC(V.sub(1),0,facets,4)
-  bc6 = DirichletBC(V.sub(4),Constant(phiAQ/1000),facets,5)
+  bc6 = DirichletBC(V.sub(4),Constant(0),facets,5)
   bc6x = DirichletBC(V.sub(1),ccl0,facets,3)
   # assign boundary condition for H+ and OH-
   bc7 = DirichletBC(V.sub(2),ch0,facets,4)
   bc8 = DirichletBC(V.sub(2),ch0,facets,3)
   bc9 = DirichletBC(V.sub(3),coh0,facets,4)
   bc10 = DirichletBC(V.sub(3),coh0,facets,3)
-  bcx = DirichletBC(V.sub(4),Constant(phiPore/1000),facets,2)
+  bcx = DirichletBC(V.sub(4),Constant(0),facets,2)
 
 
   #-------------------------------------
@@ -184,10 +186,10 @@ def runPNP(
   fluxck = project(grad(ck_u)*Constant(Dk),W)
   #print "step after fluxck"
 
-  v1file = File("solutions/AQ_{}_{}_{}.pvd".format(cK,num,phiAQ))
+  v1file = File("solutions/AQ_{}_{}.pvd".format(cK,num))
   v1file << ck_u
-  v2file = File("solutions/ckflux_%s.pvd"%(str(cK)))
-  v2file << fluxck
+  #v2file = File("solutions/ckflux_%s.pvd"%(str(cK)))
+  #v2file << fluxck
 
   import os
   myPath = os.path.abspath(__file__)
@@ -231,11 +233,11 @@ def runPNP(
   #print "length", length
   #print "RevH", RevH
   #print "Deff", Deff
-  file = open("AQ_{}_{}.txt".format(num, phiAQ), "w")
+  file = open("AQ_{}.txt".format(num), "w")
   file.write("Deff {:3}\n".format(Deff))
   file.write("Deff {:3}\n".format(Deffbot))
   #file.write("{:3}".format(Deff))
-  file.write("VolFrac {:3}".format(area8/area3))
+  file.write("VolFrac {:3}".format(area5/area3))
   #file.write("{:3}".format(area7/area3))
   file.close()
   return Deff
@@ -295,12 +297,12 @@ if __name__ == "__main__":
       arg2=np.float(sys.argv[i+2])
       arg3=np.float(sys.argv[i+3])
       arg4=np.float(sys.argv[i+4])
-      runPNP(meshfile=arg1, phiPore=arg2,phiAQ=arg3,cKCl=arg4) #same as at the pickle line, justing doing radii
+      runPNP(meshfile=arg1, phiPore=arg2,aqD=arg3,cKCl=arg4) #same as at the pickle line, justing doing radii
       quit()
     if(arg=="-runner"):
       arg1=sys.argv[i+1]
       arg2=int(sys.argv[i+2])
-      arg3=int(sys.argv[i+3])
-      arg4=1#int(sys.argv[i+4])
-      runPNP(meshfile=arg1,num=arg2, phiAQ = arg3, cKCl = arg4) #value provided is in mM = mol/m^3
+      #arg3=float(sys.argv[i+3])
+      arg3=1#int(sys.argv[i+4])
+      runPNP(meshfile=arg1,num=arg2, cKCl = arg3) #value provided is in mM = mol/m^3
       quit()
